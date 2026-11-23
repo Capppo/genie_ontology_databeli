@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # MAGIC %md
 # MAGIC # 00 - Shared config
 # MAGIC
@@ -11,8 +15,8 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog_name", "genie_ontology_demo", "Catalog name")
-dbutils.widgets.text("schema_name", "retail_demo", "Schema name")
+dbutils.widgets.text("catalog_name", "main", "Catalog name")
+dbutils.widgets.text("schema_name", "genie_ontology_retail_demo", "Schema name")
 
 CATALOG = dbutils.widgets.get("catalog_name")
 SCHEMA = dbutils.widgets.get("schema_name")
