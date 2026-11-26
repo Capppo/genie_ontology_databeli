@@ -322,10 +322,28 @@ from databricks.sdk import WorkspaceClient
 w_user = WorkspaceClient()
 
 DOMAINS = {
-    "Sales":        ("sales",        "Retail sales performance and revenue analytics"),
-    "Customer":     ("customer",     "Customer behavior, returns and segmentation"),
-    "Supply Chain": ("supply-chain", "Inventory health and stock performance"),
-    "Finance":      ("finance",      "Financial reporting and revenue accounting"),
+    "Sales": {
+        "subtitle": "Retail sales performance and revenue analytics",
+        "description": "Everything about revenue and sales performance: revenue and order "
+                       "trends by product category and brand, store region and channel, "
+                       "and average order value.",
+    },
+    "Customer": {
+        "subtitle": "Customer behavior, returns and segmentation",
+        "description": "Customer behavior across the retail business: returns and return "
+                       "rates against revenue, customer segments and geographies.",
+    },
+    "Supply Chain": {
+        "subtitle": "Inventory health and stock performance",
+        "description": "Inventory health across stores and products: stock on hand, stock "
+                       "coverage and replenishment signals for the retail operation.",
+    },
+    "Finance": {
+        "subtitle": "Financial reporting and revenue accounting",
+        "description": "Financial reporting over the same retail metrics: revenue accounting "
+                       "and margin proxies at cost across product, customer and store "
+                       "dimensions.",
+    },
 }
 
 existing_policies = {
@@ -337,7 +355,7 @@ existing_domains = {
     for d in w_user.api_client.do("GET", "/api/2.0/domains")["domains"]
 }
 
-for tag_key, (domain_id, subtitle) in DOMAINS.items():
+for tag_key, attrs in DOMAINS.items():
     if tag_key not in existing_policies:
         w_user.api_client.do("POST", "/api/2.1/tag-policies", body={"tag_key": tag_key})
         print(f"Created governed tag: {tag_key}")
@@ -345,30 +363,40 @@ for tag_key, (domain_id, subtitle) in DOMAINS.items():
         w_user.api_client.do(
             "POST",
             "/api/2.0/domains",
-            body={"domain_id": domain_id, "tag_key": tag_key, "subtitle": subtitle},
+            body={
+                "tag_key": tag_key,
+                "subtitle": attrs["subtitle"],
+                "description": attrs["description"],
+            },
         )
         print(f"Created domain: {tag_key}")
     else:
         print(f"Domain already exists: {tag_key}")
 
 # The create endpoint does not set display names (it also ignores a custom
-# domain_id and generates its own UUID) - PATCH the display name onto any
-# domain still missing one.
+# domain_id and generates its own UUID) - PATCH display_name and description
+# onto any domain still missing them.
 current_domains = {
     d["tag_key"]: d
     for d in w_user.api_client.do("GET", "/api/2.0/domains")["domains"]
 }
-for tag_key in DOMAINS:
+for tag_key, attrs in DOMAINS.items():
     domain = current_domains.get(tag_key)
-    if domain is None or domain.get("display_name"):
+    if domain is None:
         continue
-    w_user.api_client.do(
-        "PATCH",
-        f"/api/2.0/domains/{domain['domain_id']}",
-        body={"display_name": tag_key},
-        query={"update_mask": "display_name"},
-    )
-    print(f"Set display name for domain: {tag_key}")
+    updates = {}
+    if not domain.get("display_name"):
+        updates["display_name"] = tag_key
+    if not domain.get("description"):
+        updates["description"] = attrs["description"]
+    if updates:
+        w_user.api_client.do(
+            "PATCH",
+            f"/api/2.0/domains/{domain['domain_id']}",
+            body=updates,
+            query={"update_mask": ",".join(updates)},
+        )
+        print(f"Updated domain {tag_key}: set {', '.join(updates)}")
 
 # Assign the Genie Agent to the Sales domain (key-only governed tag) —
 # idempotent, mirroring the certify cell.
